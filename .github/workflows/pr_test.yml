@@ -1,0 +1,71 @@
+name: Pull Request 테스트 워크 플로우
+ 
+on:
+  pull_request:
+  # push:
+    branches: [ master ] 
+ 
+jobs:
+  module_dependence_test:
+    name: 모듈 의존성 테스트
+    runs-on: [self-hosted]
+    steps:
+      - uses: yumis-coconudge/clean-workspace-action@v1
+
+      - uses: actions/checkout@v2
+
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
+  
+      - name: Add token in .npmrc
+        env:
+          NPM_TOKEN: ${{ secrets.GIT_TOKEN }} 
+        run: |
+          echo -e "\n//npm.pkg.github.com/:_authToken=${NPM_TOKEN}" >> .npmrc
+
+      - name: 테스트용 환경변수 파일 생성
+        env:
+          ENV_INFO: ${{ secrets.TEST_ENV }} 
+        run: |
+          echo -e "${ENV_INFO}" >> .env
+
+      - name: setting info to json
+        uses: frabert/replace-string-action@v2.0
+        id: string_sed
+        with:
+          pattern: "'"
+          string: '${{ secrets.TEST_FIREBASE_FILE }} '
+          replace-with: '"'
+          flags: 'g'
+
+      - name: 테스트용 FirebaseAdmin 파일 생성
+        env:
+          TEST_FIREBASE_FILE: ${{ secrets.TEST_FIREBASE_FILE }} 
+        run: echo '${{ steps.string_sed.outputs.replaced }}' > firebase.json
+
+      - name: 테스트 시작
+        run: |
+          yarn
+          yarn test:integration
+
+      # - name: Test Report
+      #   uses: dorny/test-reporter@v1
+      #   if: success() || failure()    # run this step even if previous step failed
+      #   with:
+      #     name: JEST Tests            # Name of the check run which will be created
+      #     path: reports/jest-*.xml    # Path to test results
+      #     reporter: jest-junit        # Format of test results
+      # - name: Setup Python
+      #   uses: actions/setup-python@v4
+      #   with:
+      #     python-version: 3.8
+
+      # - name: Publish Test Results
+      #   uses: EnricoMi/publish-unit-test-result-action/composite@v2
+      #   if: always()
+      #   with:
+      #     files: |
+      #       reports/**/*.xml
+      #       reports/**/*.trx
+      

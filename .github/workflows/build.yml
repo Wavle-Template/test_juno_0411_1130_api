@@ -1,0 +1,92 @@
+name: 새로운 프로젝트 빌드
+on:
+  workflow_dispatch:
+    inputs:
+      project-name:
+        description: 프로젝트명
+        required: true
+      project-name-en:
+        description: 프로젝트명(영문)
+        required: true
+      setting:
+        description: 셋팅정보(JSON)
+        required: true
+jobs:
+  build_process:
+    name: 프로젝트 셋팅 및 빌드
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          token: ${{ secrets.GIT_TOKEN }}
+      
+      - name: setting info to json
+        uses: frabert/replace-string-action@v2.0
+        id: string_sed
+        with:
+          pattern: "'"
+          string: '${{ github.event.inputs.setting }}'
+          replace-with: '"'
+          flags: 'g'
+          
+      - name: setting 파일 저장
+        run: echo '${{ steps.string_sed.outputs.replaced }}' > setting.json
+        
+#       - name: 프로젝트 셋팅
+#         run: ls -la
+
+      - name: Add token in .npmrc
+        env:
+          NPM_TOKEN: ${{ secrets.GIT_TOKEN }} 
+        run: |
+          echo -e "\n//npm.pkg.github.com/:_authToken=${NPM_TOKEN}" >> .npmrc
+
+      - name: deploy setting
+        run: |
+          yarn
+          yarn deploy:setting false 
+          rm -rf node_modules
+          rm -rf .npmrc
+      # yarn test:integration
+#       - name: 프로젝트 repository 생성
+#         uses: repo-ctrl/create-repo-action@main 
+#         id: create-repo
+#         with:
+#           repo-name: '${{ github.event.inputs.project-name-en}}_api'
+#           org-admin-token: '${{ secrets.GIT_TOKEN }}'
+          
+#       - name: Log URL to the repo
+#         run: echo "The new repo is ${{ steps.create-repo.outputs.repo-url }}"
+        
+      # - name: Sleep for 5 seconds
+      #  uses: jakejarvis/wait-action@master
+      #  with:
+      #    time: '5s'
+      
+      - name: git 초기화
+        run: |
+          git branch master
+          git checkout master
+          rm -rf .git
+          git init
+          git config --global user.name "Wavle Developer"
+          git config --global user.email "wavle-developer@users.noreply.github.com"
+      
+      - name: Setup SSH
+        uses: MrSquaare/ssh-setup-action@v2
+        with:
+          host: github.com
+          private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+      # git remote add origin git@github.com:yumis-coconudge/${{ github.event.inputs.project-name-en}}_api.git    
+      
+      - name: Log URL to the repo
+        run: echo "git@github.com:Wavle-Template/${{ github.event.inputs.project-name-en}}_api.git"
+        
+      - name: git add remote url & push
+        run: |
+          git add --all
+          git commit -m "first commit"
+          git branch -M master
+          git remote add origin git@github.com:Wavle-Template/${{github.event.inputs.project-name-en}}_api.git
+          git push -f origin master
+          
